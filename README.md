@@ -1,2 +1,6 @@
 # obj
-obj team repository
+## obj team repository
+
+JSP + Java Study Group
+
+DB Connection 
