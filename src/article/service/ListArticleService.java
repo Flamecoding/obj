@@ -1,26 +1,28 @@
 package article.service;
 
 import java.sql.Connection;
-import java.sql.SQLException;
 import java.util.List;
 
 import article.dao.ArticleDao;
 import article.model.Article;
+import jdbc.JdbcUtil;
 import jdbc.connection.ConnectionProvider;
+import util.PageBean;
+import util.PageUtility;
 
 public class ListArticleService {
 
 	private ArticleDao articleDao = new ArticleDao();
-	private int size = 10;
 
-	public ArticlePage getArticlePage(int pageNum) {
+	public List<Article> getArticleList(PageBean bean) {
 		try (Connection conn = ConnectionProvider.getConnection()) {
-			int total = articleDao.selectCount(conn);
-			List<Article> content = articleDao.select(
-					conn, (pageNum - 1) * size, size);
-			return new ArticlePage(total, pageNum, size, content);
-		} catch (SQLException e) {
-			throw new RuntimeException(e);
+			int total = articleDao.getTotalCount(conn, bean);
+			PageUtility bar = new PageUtility(bean.getInterval(), total, bean.getPageNo());
+			bean.setPageLink(bar.getPageBar());
+			return articleDao.getArticleList(conn, bean);
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
+		return null;
 	}
 }

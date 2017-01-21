@@ -23,13 +23,11 @@ public class WriteArticleService {
 			conn.setAutoCommit(false);
 
 			Article article = toArticle(req);
-			Article savedArticle = articleDao.insert(conn, article);
+			Article savedArticle = articleDao.insertArticle(conn, article);
 			if (savedArticle == null) {
 				throw new RuntimeException("fail to insert article");
 			}
-			ArticleContent content = new ArticleContent(
-					savedArticle.getNumber(),
-					req.getContent());
+			ArticleContent content = new ArticleContent(savedArticle.getNumber(), req.getContent());
 			ArticleContent savedContent = contentDao.insert(conn, content);
 			if (savedContent == null) {
 				throw new RuntimeException("fail to insert article_content");

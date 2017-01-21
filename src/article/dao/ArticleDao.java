@@ -4,7 +4,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Date;
@@ -13,27 +12,32 @@ import java.util.List;
 import article.model.Article;
 import article.model.Writer;
 import jdbc.JdbcUtil;
+import util.PageBean;
 
 public class ArticleDao {
 
-	public Article insert(Connection conn, Article article) throws SQLException {
-		PreparedStatement pstmt = null;
-		Statement stmt = null;
+	@SuppressWarnings("resource")
+	public Article insertArticle(Connection conn, Article article) throws SQLException {
+		PreparedStatement stmt = null;
 		ResultSet rs = null;
 		try {
-			pstmt = conn.prepareStatement("insert into article "
-					+ "(writer_id, writer_name, title, regdate, moddate, read_cnt) "
-					+ "values (?,?,?,?,?,0)");
-			pstmt.setString(1, article.getWriter().getId());
-			pstmt.setString(2, article.getWriter().getName());
-			pstmt.setString(3, article.getTitle());
-			pstmt.setTimestamp(4, toTimestamp(article.getRegDate()));
-			pstmt.setTimestamp(5, toTimestamp(article.getModifiedDate()));
-			int insertedCount = pstmt.executeUpdate();
+			StringBuilder sql = new StringBuilder();
+			sql.append(" INSERT INTO ARTICLE \n");
+			sql.append(" (WRITER_ID, WRITER_NAME, TITLE, REGDATE, MODDATE, READ_CNT) \n");
+			sql.append(" values (?, ?, ?, ?, ?, 0) ");
+			stmt = conn.prepareStatement(sql.toString());
+			stmt.setString(1, article.getWriter().getId());
+			stmt.setString(2, article.getWriter().getName());
+			stmt.setString(3, article.getTitle());
+			stmt.setTimestamp(4, toTimestamp(article.getRegDate()));
+			stmt.setTimestamp(5, toTimestamp(article.getModifiedDate()));
+			int insertedCount = stmt.executeUpdate();
 
 			if (insertedCount > 0) {
-				stmt = conn.createStatement();
-				rs = stmt.executeQuery("select last_insert_id() from article");
+				StringBuilder sql2 = new StringBuilder();
+				sql2.append(" SELECT MAX(ARTICLE_NO) FROM ARTICLE ");
+				stmt = conn.prepareStatement(sql2.toString());
+				rs = stmt.executeQuery();
 				if (rs.next()) {
 					Integer newNo = rs.getInt(1);
 					return new Article(newNo,
@@ -48,7 +52,6 @@ public class ArticleDao {
 		} finally {
 			JdbcUtil.close(rs);
 			JdbcUtil.close(stmt);
-			JdbcUtil.close(pstmt);
 		}
 	}
 
@@ -56,51 +59,124 @@ public class ArticleDao {
 		return new Timestamp(date.getTime());
 	}
 
-	public int selectCount(Connection conn) throws SQLException {
-		Statement stmt = null;
+	public int getTotalCount(Connection conn, PageBean bean) throws SQLException {
+//		Statement stmt = null;
+//		ResultSet rs = null;
+//		try {
+//			stmt = conn.createStatement();
+//			rs = stmt.executeQuery("select count(*) from article");
+//			if (rs.next()) {
+//				return rs.getInt(1);
+//			}
+//			return 0;
+//		} finally {
+//			JdbcUtil.close(rs);
+//			JdbcUtil.close(stmt);
+//		}
+		PreparedStatement stmt = null;
 		ResultSet rs = null;
 		try {
-			stmt = conn.createStatement();
-			rs = stmt.executeQuery("select count(*) from article");
-			if (rs.next()) {
-				return rs.getInt(1);
+			String word = bean.getWord();
+			String key = bean.getKey();
+
+			StringBuilder sql = new StringBuilder();
+			sql.append(" SELECT COUNT(*) CNT FROM ARTICLE WHERE 1 = 1 ");
+			if (word != null && !word.trim().equals("") && !key.equals("ALL")) {
+				if (key.equals("USER_ID")) {
+					sql.append(" AND WRITER_ID LIKE ? \n");
+				} else if (key.equals("USER_NAME")) {
+					sql.append(" AND WRITER_NAME LIKE ? \n");
+				} else if (key.equals("ARTICLE_TITLE")) {
+					sql.append(" AND TITLE LIKE ? \n");
+				} 
 			}
-			return 0;
+			stmt = conn.prepareStatement(sql.toString());
+			
+			int idx = 1;
+			if (word != null && !word.trim().equals("") && !key.equals("ALL")) {
+				if (key.equals("USER_ID") || key.equals("USER_NAME") || key.equals("ARTICLE_TITLE")) {
+					stmt.setString(idx++, "%" + word + "%");
+				} 
+			}
+			rs = stmt.executeQuery();
+			
+			if (rs.next()) {
+				return rs.getInt("CNT");
+			}
+		} finally {
+			JdbcUtil.close(rs);
+			JdbcUtil.close(stmt);
+		}
+		return 1;
+	}
+
+	public List<Article> getArticleList(Connection conn, PageBean bean) throws SQLException {
+//		PreparedStatement pstmt = null;
+//		ResultSet rs = null;
+//		try {
+//			pstmt = conn.prepareStatement("select * from article " +
+//					"order by article_no desc limit ?, ?");
+//			pstmt.setInt(1, startRow);
+//			pstmt.setInt(2, size);
+//			rs = pstmt.executeQuery();
+//			List<Article> result = new ArrayList<>();
+//			while (rs.next()) {
+//				result.add(convertArticle(rs));
+//			}
+//			return result;
+//		} finally {
+//			JdbcUtil.close(rs);
+//			JdbcUtil.close(pstmt);
+//		}
+		PreparedStatement stmt = null;
+		ResultSet rs = null;
+		try {
+			String key = bean.getKey();
+			String word = bean.getWord();
+			StringBuilder sql = new StringBuilder();
+			sql.append(" SELECT * FROM ARTICLE WHERE 1 = 1 \n");
+			if (word != null && !word.trim().equals("") && !key.equals("ALL")) {
+				if (key.equals("USER_ID")) {
+					sql.append(" AND WRITER_ID LIKE ? \n");
+				} else if (key.equals("USER_NAME")) {
+					sql.append(" AND WRITER_NAME LIKE ? \n");
+				} else if (key.equals("ARTICLE_TITLE")) {
+					sql.append(" AND TITLE LIKE ? \n");
+				} 
+			}
+			sql.append(" ORDER BY ARTICLE_NO DESC \n");
+			sql.append(" LIMIT ?, ? \n");
+			stmt = conn.prepareStatement(sql.toString());
+
+			int idx = 1;
+			if (word != null && !word.trim().equals("") && !key.equals("all")) {
+				if ( key.equals("USER_ID") || key.equals("USER_NAME") || key.equals("ARTICLE_TITLE") ) {
+					stmt.setString(idx++, "%" + word + "%");
+				} 
+			}
+			stmt.setInt(idx++, bean.getStart());
+			stmt.setInt(idx++, bean.getInterval());
+			rs = stmt.executeQuery();
+			
+			List<Article> list = new ArrayList<Article>();
+			while (rs.next()) {
+				list.add(convertArticle(rs));
+			}
+			return list;
 		} finally {
 			JdbcUtil.close(rs);
 			JdbcUtil.close(stmt);
 		}
 	}
 
-	public List<Article> select(Connection conn, int startRow, int size) throws SQLException {
-		PreparedStatement pstmt = null;
-		ResultSet rs = null;
-		try {
-			pstmt = conn.prepareStatement("select * from article " +
-					"order by article_no desc limit ?, ?");
-			pstmt.setInt(1, startRow);
-			pstmt.setInt(2, size);
-			rs = pstmt.executeQuery();
-			List<Article> result = new ArrayList<>();
-			while (rs.next()) {
-				result.add(convertArticle(rs));
-			}
-			return result;
-		} finally {
-			JdbcUtil.close(rs);
-			JdbcUtil.close(pstmt);
-		}
-	}
-
 	private Article convertArticle(ResultSet rs) throws SQLException {
 		return new Article(rs.getInt("article_no"),
-				new Writer(
-						rs.getString("writer_id"),
+				new Writer(rs.getString("writer_id"),
 						rs.getString("writer_name")),
-				rs.getString("title"),
-				toDate(rs.getTimestamp("regdate")),
-				toDate(rs.getTimestamp("moddate")),
-				rs.getInt("read_cnt"));
+						rs.getString("title"),
+						toDate(rs.getTimestamp("regdate")),
+						toDate(rs.getTimestamp("moddate")),
+						rs.getInt("read_cnt"));
 	}
 
 	private Date toDate(Timestamp timestamp) {

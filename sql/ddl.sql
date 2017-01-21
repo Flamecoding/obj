@@ -29,12 +29,8 @@ CREATE TABLE board.comment (
 	comment_no int auto_increment primary key,
 	article_no int not null,
 	memberid varchar(50) not null,
-	name varchar(50) not null,
-	parent_comment_no int default 0,
-	depth int default 0,
-	comment_order int not null,
 	comment_content varchar(1000) not null,
 	regdate datetime not null,
 	moddate datetime not null,
 	is_delete char(1) default 'N'
-) engine=InnoDB default character set = utf-8;
+) engine=InnoDB default character set = utf8;
